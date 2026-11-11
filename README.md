@@ -136,7 +136,7 @@ Capturas reales de la app Android corriendo contra la API (más bocetos de la gu
 
 SQL Server Express, base de datos **`E-COMMERCE`** (compartida con el proyecto MVC de referencia). Diseño del DER (actual):
 
-![DERACTUAL](docs/images/guia/DER_ecommerce (1).png)
+![DERACTUAL](docs/images/guia/DER_ecommerce.png)
 
 Diseño del DER (imagen original de la propuesta):
 
