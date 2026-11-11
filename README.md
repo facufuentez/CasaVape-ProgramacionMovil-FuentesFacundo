@@ -241,6 +241,7 @@ cd CasaVapeApi
 # opcional: crear .env con JWT_SECRET, MP_ACCESS_TOKEN, GEMINI_API_KEY (ver .env.example)
 dotnet run
 # API en http://localhost:5178 (perfil http)
+# O API en https://casavape.runasp.net/
 ```
 
 El seed inicial crea los roles, el usuario administrador, las provincias y los estados de pedido.
