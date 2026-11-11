@@ -1,0 +1,305 @@
+@page "/admin/productos"
+@attribute [Authorize(Roles = "Administrador")]
+@inject ProductService ProductService
+@inject CategoryService CategoryService
+@inject IJSRuntime JS
+
+<PageTitle>Administrar productos - CasaVape</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+    <h1 class="h3 mb-0">Productos</h1>
+    <div class="d-flex gap-2">
+        <input class="form-control" placeholder="Buscar..." @bind="busqueda" @bind:after="Buscar" />
+        <button class="btn btn-primary" @onclick="Nuevo">Nuevo producto</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (!string.IsNullOrWhiteSpace(ok))
+{
+    <div class="alert alert-success alert-dismissible">
+        @ok
+        <button type="button" class="btn-close" @onclick="() => ok = null"></button>
+    </div>
+}
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th class="text-end">Precio</th>
+                        <th class="text-end">Stock</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var producto in productos)
+                    {
+                        <tr>
+                            <td style="width: 64px;">
+                                @if (!string.IsNullOrWhiteSpace(producto.ImagenUrl))
+                                {
+                                    <img src="@producto.ImagenUrl" alt="@producto.Nombre" class="rounded" style="width: 48px; height: 48px; object-fit: cover;" />
+                                }
+                            </td>
+                            <td>@producto.Nombre</td>
+                            <td>@producto.Categoria</td>
+                            <td class="text-end">$@producto.Precio.ToString("N2")</td>
+                            <td class="text-end">@producto.Stock</td>
+                            <td>
+                                <span class="badge rounded-pill @(producto.Activo ? "text-bg-success" : "text-bg-secondary")">
+                                    @(producto.Activo ? "Activo" : "Inactivo")
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Editar(producto)">Editar</button>
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => Eliminar(producto)">Eliminar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    if (editandoVisible)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">@(editando is null ? "Nuevo producto" : $"Editar producto")</h2>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" @bind="request.Nombre" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Categoría</label>
+                        <select class="form-select" @bind="request.IdCategoria">
+                            <option value="0">Seleccioná...</option>
+                            @foreach (var categoria in categorias)
+                            {
+                                <option value="@categoria.IdCategoria">@categoria.Nombre</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Precio</label>
+                        <input class="form-control" type="number" step="0.01" min="0" @bind="request.Precio" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Stock</label>
+                        <input class="form-control" type="number" min="0" @bind="request.Stock" />
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label">Descripción</label>
+                        <input class="form-control" @bind="request.Descripcion" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label d-block">Estado</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="activoSwitch" @bind="request.Activo" />
+                            <label class="form-check-label" for="activoSwitch">Activo</label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label">Imagen</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ElegirImagen">
+                                @(imagenSeleccionada is null ? "Elegir imagen..." : "Cambiar imagen...")
+                            </button>
+                            @if (imagenSeleccionada is not null)
+                            {
+                                <span class="text-muted">@imagenSeleccionada</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-primary" @onclick="Guardar" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar
+                    </button>
+                    <button class="btn btn-secondary" @onclick="Cancelar" disabled="@saving">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<ProductDto> productos = new();
+    private List<CategoryDto> categorias = new();
+    private CreateProductRequest request = new() { Activo = true };
+    private ProductDto? editando;
+    private bool editandoVisible;
+    private bool loading = true;
+    private bool saving;
+    private string? busqueda;
+    private string? imagenSeleccionada;
+    private string? error;
+    private string? ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categorias = await CategoryService.GetCategoriesAsync();
+        await CargarAsync();
+        loading = false;
+    }
+
+    private async Task CargarAsync()
+    {
+        productos = await ProductService.GetAdminProductsAsync(busqueda);
+    }
+
+    private async Task Buscar()
+    {
+        await CargarAsync();
+    }
+
+    private void Nuevo()
+    {
+        editando = null;
+        request = new CreateProductRequest { Activo = true, IdCategoria = categorias.Count > 0 ? categorias[0].IdCategoria : 0 };
+        imagenSeleccionada = null;
+        editandoVisible = true;
+        error = null;
+        ok = null;
+    }
+
+    private void Editar(ProductDto producto)
+    {
+        editando = producto;
+        request = new CreateProductRequest
+        {
+            IdCategoria = producto.IdCategoria,
+            Nombre = producto.Nombre,
+            Descripcion = producto.Descripcion,
+            Precio = producto.Precio,
+            Stock = producto.Stock,
+            Activo = producto.Activo
+        };
+        imagenSeleccionada = null;
+        editandoVisible = true;
+        error = null;
+        ok = null;
+    }
+
+    private void Cancelar()
+    {
+        editando = null;
+        editandoVisible = false;
+        imagenSeleccionada = null;
+    }
+
+    private async Task ElegirImagen()
+    {
+        try
+        {
+            var resultado = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Elegir imagen del producto",
+                FileTypes = FilePickerFileType.Images
+            });
+
+            if (resultado is not null)
+            {
+                imagenSeleccionada = resultado.FullPath;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task Guardar()
+    {
+        error = null;
+        ok = null;
+
+        if (string.IsNullOrWhiteSpace(request.Nombre))
+        {
+            error = "Ingresá el nombre del producto.";
+            return;
+        }
+
+        if (request.IdCategoria <= 0)
+        {
+            error = "Seleccioná una categoría.";
+            return;
+        }
+
+        saving = true;
+        var result = editando is null
+            ? await ProductService.CreateAsync(request, imagenSeleccionada)
+            : await ProductService.UpdateAsync(editando.IdProducto, new UpdateProductRequest
+            {
+                IdProducto = editando.IdProducto,
+                IdCategoria = request.IdCategoria,
+                Nombre = request.Nombre,
+                Descripcion = request.Descripcion,
+                Precio = request.Precio,
+                Stock = request.Stock,
+                Activo = request.Activo
+            }, imagenSeleccionada);
+        saving = false;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo guardar el producto.";
+            return;
+        }
+
+        ok = editando is null ? "Producto creado correctamente." : "Producto actualizado correctamente.";
+        Cancelar();
+        await CargarAsync();
+    }
+
+    private async Task Eliminar(ProductDto producto)
+    {
+        error = null;
+        ok = null;
+
+        var confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Eliminar el producto '{producto.Nombre}'?");
+        if (!confirmado)
+        {
+            return;
+        }
+
+        var result = await ProductService.DeleteAsync(producto.IdProducto);
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo eliminar el producto.";
+            return;
+        }
+
+        ok = "Producto eliminado correctamente.";
+        await CargarAsync();
+    }
+}

@@ -1,0 +1,164 @@
+@page "/admin/reportes"
+@attribute [Authorize(Roles = "Administrador")]
+@inject OrderService OrderService
+
+<PageTitle>Reportes - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Reportes de pedidos</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Desde</label>
+                <input class="form-control" type="date" @bind="desde" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Hasta</label>
+                <input class="form-control" type="date" @bind="hasta" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Estado</label>
+                <select class="form-select" @bind="estado">
+                    <option value="">Todos los estados</option>
+                    @foreach (var est in estados)
+                    {
+                        <option value="@est">@est</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="Generar" disabled="@cargando">
+                    @if (cargando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Generar
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="DescargarPdf" disabled="@(cargando || pedidos.Count == 0)">
+                    @if (descargando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (generado)
+{
+    if (pedidos.Count == 0)
+    {
+        <div class="alert alert-info">No hay pedidos que coincidan con los filtros.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-body d-flex flex-wrap gap-4">
+                <div>
+                    <span class="text-muted d-block small">Pedidos</span>
+                    <span class="fs-4 fw-bold">@pedidos.Count</span>
+                </div>
+                <div>
+                    <span class="text-muted d-block small">Total facturado</span>
+                    <span class="fs-4 fw-bold">$@pedidos.Sum(p => p.Total).ToString("N2")</span>
+                </div>
+                <div>
+                    <span class="text-muted d-block small">Ticket promedio</span>
+                    <span class="fs-4 fw-bold">$@((pedidos.Count == 0 ? 0 : pedidos.Sum(p => p.Total) / pedidos.Count).ToString("N2"))</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nº</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Pago</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pedido in pedidos)
+                        {
+                            <tr>
+                                <td class="fw-bold">@pedido.IdPedido</td>
+                                <td>@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@pedido.Usuario</td>
+                                <td>@pedido.Estado</td>
+                                <td>@(pedido.Pagos.Count > 0 ? pedido.Pagos[0].EstadoPago : "-")</td>
+                                <td class="text-end">$@pedido.Total.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="5" class="text-end">Total</th>
+                            <th class="text-end">$@pedidos.Sum(p => p.Total).ToString("N2")</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private static readonly string[] estados = { "Pendiente", "Pagado", "Enviado", "Entregado", "Cancelado" };
+
+    private List<OrderDto> pedidos = new();
+    private DateTime? desde;
+    private DateTime? hasta;
+    private string? estado;
+    private bool generado;
+    private bool cargando;
+    private bool descargando;
+    private string? error;
+
+    private async Task Generar()
+    {
+        error = null;
+        cargando = true;
+
+        pedidos = await OrderService.GetReportAsync(desde, hasta, string.IsNullOrWhiteSpace(estado) ? null : estado);
+
+        cargando = false;
+        generado = true;
+    }
+
+    private async Task DescargarPdf()
+    {
+        error = null;
+        descargando = true;
+
+        var result = await OrderService.DownloadReportPdfAsync(desde, hasta, string.IsNullOrWhiteSpace(estado) ? null : estado);
+        descargando = false;
+
+        if (!result.Ok || result.Data is null)
+        {
+            error = result.Error ?? "No se pudo generar el PDF.";
+            return;
+        }
+
+        try
+        {
+            await Launcher.OpenAsync(new OpenFileRequest { File = new ReadOnlyFile(result.Data) });
+        }
+        catch
+        {
+            error = "No se pudo abrir el PDF. Archivo guardado en " + result.Data;
+        }
+    }
+}

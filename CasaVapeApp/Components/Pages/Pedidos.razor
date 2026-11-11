@@ -1,0 +1,159 @@
+@page "/pedidos"
+@attribute [Authorize]
+@inject OrderService OrderService
+
+<PageTitle>Mis pedidos - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Mis pedidos</h1>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else if (pedidos.Count == 0)
+{
+    <div class="alert alert-info">
+        Todavía no hiciste pedidos.
+        <a href="/" class="alert-link">Empezar a comprar</a>
+    </div>
+}
+else
+{
+    <div class="accordion" id="pedidosAccordion">
+        @foreach (var pedido in pedidos)
+        {
+            var mostrar = expandido == pedido.IdPedido;
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button type="button" class="accordion-button @(mostrar ? string.Empty : "collapsed")" @onclick="() => Toggle(pedido.IdPedido)">
+                        <span class="me-3 fw-bold">#@pedido.IdPedido</span>
+                        <span class="me-3">@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</span>
+                        <span class="badge rounded-pill @EstadoClass(pedido.Estado) me-3">@pedido.Estado</span>
+                        <span class="ms-auto me-3">$@pedido.Total.ToString("N2")</span>
+                    </button>
+                </h2>
+                <div class="accordion-collapse collapse @(mostrar ? "show" : string.Empty)">
+                    <div class="accordion-body">
+                        <p class="mb-2">
+                            <strong>Entrega:</strong> @pedido.MetodoEntrega
+                            <span class="text-muted">(envío $@pedido.CostoEnvio.ToString("N2"))</span>
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th class="text-end">Precio unit.</th>
+                                        <th class="text-end">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var detalle in pedido.Detalles)
+                                    {
+                                        <tr>
+                                            <td>@detalle.Producto</td>
+                                            <td class="text-end">@detalle.Cantidad</td>
+                                            <td class="text-end">$@detalle.PrecioUnitario.ToString("N2")</td>
+                                            <td class="text-end">$@detalle.Subtotal.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Total</th>
+                                        <th class="text-end">$@pedido.Total.ToString("N2")</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        @if (pedido.Pagos.Count > 0)
+                        {
+                            <p class="mb-2">
+                                <strong>Pago:</strong> @pedido.Pagos[0].MetodoPago
+                                <span class="badge rounded-pill @PagoClass(pedido.Pagos[0].EstadoPago)">@pedido.Pagos[0].EstadoPago</span>
+                            </p>
+                        }
+
+                        <button class="btn btn-outline-primary btn-sm" @onclick="() => DescargarComprobante(pedido.IdPedido)" disabled="@(descargando == pedido.IdPedido)">
+                            @if (descargando == pedido.IdPedido)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Descargar comprobante
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<OrderDto> pedidos = new();
+    private int? expandido;
+    private int? descargando;
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        pedidos = await OrderService.GetMyOrdersAsync();
+        loading = false;
+    }
+
+    private void Toggle(int idPedido)
+    {
+        expandido = expandido == idPedido ? null : idPedido;
+    }
+
+    private async Task DescargarComprobante(int idPedido)
+    {
+        error = null;
+        descargando = idPedido;
+
+        var result = await OrderService.DownloadReceiptAsync(idPedido);
+        descargando = null;
+
+        if (!result.Ok || result.Data is null)
+        {
+            error = result.Error ?? "No se pudo descargar el comprobante.";
+            return;
+        }
+
+        try
+        {
+            await Launcher.OpenAsync(new OpenFileRequest { File = new ReadOnlyFile(result.Data) });
+        }
+        catch
+        {
+            error = "No se pudo abrir el comprobante. Archivo guardado en " + result.Data;
+        }
+    }
+
+    private static string EstadoClass(string estado) => estado switch
+    {
+        "Pendiente" => "text-bg-warning",
+        "Pagado" => "text-bg-info",
+        "Enviado" => "text-bg-primary",
+        "Entregado" => "text-bg-success",
+        "Cancelado" => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+
+    private static string PagoClass(string estadoPago) => estadoPago switch
+    {
+        "Aprobado" => "text-bg-success",
+        "Rechazado" => "text-bg-danger",
+        _ => "text-bg-warning"
+    };
+}

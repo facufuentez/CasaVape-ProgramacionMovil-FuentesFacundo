@@ -1,0 +1,235 @@
+@page "/admin/usuarios"
+@attribute [Authorize(Roles = "Administrador")]
+@inject AdminUserService AdminUserService
+
+<PageTitle>Administrar usuarios - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Usuarios</h1>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (!string.IsNullOrWhiteSpace(ok))
+{
+    <div class="alert alert-success alert-dismissible">
+        @ok
+        <button type="button" class="btn-close" @onclick="() => ok = null"></button>
+    </div>
+}
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th class="text-end">Pedidos</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var usuario in usuarios)
+                    {
+                        <tr>
+                            <td>@usuario.Nombre @usuario.Apellido</td>
+                            <td>@usuario.Email</td>
+                            <td>
+                                @foreach (var rol in usuario.Roles)
+                                {
+                                    <span class="badge rounded-pill @(rol == "Administrador" ? "text-bg-danger" : "text-bg-secondary")">@rol</span>
+                                }
+                            </td>
+                            <td class="text-end">@usuario.CantidadPedidos</td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => EditarRoles(usuario)">Roles</button>
+                                <button class="btn btn-outline-warning btn-sm" @onclick="() => ResetearPassword(usuario)">Contraseña</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    if (editandoRoles is not null)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Roles de @editandoRoles.Nombre @editandoRoles.Apellido</h2>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="rolCliente" checked="rolCliente" @onchange="e => rolCliente = (bool)(e.Value ?? false)" />
+                    <label class="form-check-label" for="rolCliente">Cliente</label>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="rolAdmin" checked="rolAdmin" @onchange="e => rolAdmin = (bool)(e.Value ?? false)" />
+                    <label class="form-check-label" for="rolAdmin">Administrador</label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" @onclick="GuardarRoles" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar roles
+                    </button>
+                    <button class="btn btn-secondary" @onclick="() => editandoRoles = null" disabled="@saving">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    if (resetearPassword is not null)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Resetear contraseña de @resetearPassword.Nombre @resetearPassword.Apellido</h2>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Nueva contraseña</label>
+                        <input class="form-control" type="text" @bind="nuevaPassword" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Confirmar</label>
+                        <input class="form-control" type="text" @bind="confirmarPassword" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-primary" @onclick="GuardarPassword" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Resetear contraseña
+                    </button>
+                    <button class="btn btn-secondary" @onclick="() => resetearPassword = null" disabled="@saving">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<UserDto> usuarios = new();
+    private UserDto? editandoRoles;
+    private UserDto? resetearPassword;
+    private bool rolCliente = true;
+    private bool rolAdmin;
+    private string nuevaPassword = string.Empty;
+    private string confirmarPassword = string.Empty;
+    private bool loading = true;
+    private bool saving;
+    private string? error;
+    private string? ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        usuarios = await AdminUserService.GetUsersAsync();
+        loading = false;
+    }
+
+    private void EditarRoles(UserDto usuario)
+    {
+        resetearPassword = null;
+        editandoRoles = usuario;
+        rolCliente = usuario.Roles.Contains("Cliente");
+        rolAdmin = usuario.Roles.Contains("Administrador");
+        error = null;
+        ok = null;
+    }
+
+    private void ResetearPassword(UserDto usuario)
+    {
+        editandoRoles = null;
+        resetearPassword = usuario;
+        nuevaPassword = string.Empty;
+        confirmarPassword = string.Empty;
+        error = null;
+        ok = null;
+    }
+
+    private async Task GuardarRoles()
+    {
+        error = null;
+        ok = null;
+
+        if (!rolCliente && !rolAdmin)
+        {
+            error = "El usuario debe tener al menos un rol.";
+            return;
+        }
+
+        var roles = new List<string>();
+        if (rolCliente)
+        {
+            roles.Add("Cliente");
+        }
+        if (rolAdmin)
+        {
+            roles.Add("Administrador");
+        }
+
+        saving = true;
+        var result = await AdminUserService.UpdateRolesAsync(editandoRoles!.Id, roles);
+        saving = false;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudieron actualizar los roles.";
+            return;
+        }
+
+        ok = "Roles actualizados correctamente.";
+        editandoRoles = null;
+        usuarios = await AdminUserService.GetUsersAsync();
+    }
+
+    private async Task GuardarPassword()
+    {
+        error = null;
+        ok = null;
+
+        if (nuevaPassword.Length < 6)
+        {
+            error = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        if (nuevaPassword != confirmarPassword)
+        {
+            error = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        saving = true;
+        var result = await AdminUserService.ResetPasswordAsync(resetearPassword!.Id, new ResetPasswordRequest
+        {
+            NuevaPassword = nuevaPassword,
+            ConfirmarPassword = confirmarPassword
+        });
+        saving = false;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo resetear la contraseña.";
+            return;
+        }
+
+        ok = "Contraseña actualizada correctamente.";
+        resetearPassword = null;
+    }
+}

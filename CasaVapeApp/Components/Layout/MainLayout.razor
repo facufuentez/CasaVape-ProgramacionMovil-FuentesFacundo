@@ -1,0 +1,109 @@
+﻿@inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+<div class="app-shell">
+    <aside class="app-sidebar" id="appSidebar">
+        <div class="sidebar-header">
+            <a class="sidebar-brand" href="">
+                <img src="images/LogoCasaVape.png" alt="Casa Vape" class="logo-light" />
+                <img src="images/LogoCasaVape-blanco.png" alt="Casa Vape" class="logo-dark" />
+            </a>
+            <button type="button" class="btn-close d-lg-none" @onclick="CloseSidebar" aria-label="Cerrar menú"></button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <NavMenu />
+        </nav>
+    </aside>
+
+    <div class="app-overlay" @onclick="CloseSidebar"></div>
+
+    <div class="app-main">
+        <header class="app-topbar">
+            <button type="button" class="btn btn-outline-secondary d-lg-none" @onclick="OpenSidebar" aria-label="Abrir menú">
+                <i class="fa-solid fa-bars" aria-hidden="true"></i>
+            </button>
+
+            <a class="topbar-brand d-lg-none" href="">
+                <img src="images/LogoCasaVape.png" alt="Casa Vape" class="logo-light" />
+                <img src="images/LogoCasaVape-blanco.png" alt="Casa Vape" class="logo-dark" />
+            </a>
+
+            <div class="search-form">
+                <input class="form-control" type="search" placeholder="Buscar productos..." aria-label="Buscar productos" />
+                <button class="btn btn-primary" type="submit">Buscar</button>
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary flex-shrink-0 ms-auto" @onclick="ToggleTheme"
+                    aria-label="@ThemeLabel" title="@ThemeLabel">
+                <i class="fa-solid fa-sun theme-icon-light" aria-hidden="true"></i>
+                <i class="fa-solid fa-moon theme-icon-dark" aria-hidden="true"></i>
+            </button>
+        </header>
+
+        <main role="main" class="app-content">
+            @Body
+        </main>
+
+        <footer class="app-footer">
+            &copy; 2026 - CasaVape
+        </footer>
+    </div>
+</div>
+
+@code {
+    private string currentTheme = "light";
+
+    private string ThemeLabel => currentTheme == "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var stored = await JS.InvokeAsync<string>("localStorage.getItem", "theme");
+                if (stored == "dark" || stored == "light")
+                {
+                    currentTheme = stored;
+                }
+            }
+            catch
+            {
+            }
+
+            await JS.InvokeVoidAsync("casaVape.setTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenSidebar()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("casaVape.openSidebar");
+        }
+        catch
+        {
+            await JS.InvokeVoidAsync("eval", "document.body.classList.add('sidebar-open')");
+        }
+    }
+
+    private async Task CloseSidebar()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("casaVape.closeSidebar");
+        }
+        catch
+        {
+            await JS.InvokeVoidAsync("eval", "document.body.classList.remove('sidebar-open')");
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = currentTheme == "dark" ? "light" : "dark";
+        await JS.InvokeVoidAsync("casaVape.setTheme", currentTheme);
+    }
+}

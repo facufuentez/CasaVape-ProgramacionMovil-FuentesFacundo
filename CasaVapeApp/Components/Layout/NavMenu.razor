@@ -1,0 +1,54 @@
+﻿@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject CasaVapeApp.Services.AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<nav class="sidebar-nav">
+    <span class="sidebar-heading">General</span>
+    <NavLink class="sidebar-link" href="" Match="NavLinkMatch.All">
+        <span>Inicio</span>
+    </NavLink>
+    <NavLink class="sidebar-link" href="carrito">
+        <span>Carrito</span>
+    </NavLink>
+
+    <AuthorizeView>
+        <Authorized>
+            <span class="sidebar-heading">Mi cuenta</span>
+            <NavLink class="sidebar-link" href="pedidos">Mis pedidos</NavLink>
+            <NavLink class="sidebar-link" href="cuenta">Mi cuenta</NavLink>
+            <NavLink class="sidebar-link" href="direcciones">Mis direcciones</NavLink>
+
+            <AuthorizeView Roles="Administrador">
+                <Authorized Context="admin">
+                    <span class="sidebar-heading">Administración</span>
+                    <NavLink class="sidebar-link" href="admin/productos">Productos</NavLink>
+                    <NavLink class="sidebar-link" href="admin/categorias">Categorías</NavLink>
+                    <NavLink class="sidebar-link" href="admin/pedidos">Pedidos</NavLink>
+                    <NavLink class="sidebar-link" href="admin/usuarios">Usuarios</NavLink>
+                    <NavLink class="sidebar-link" href="admin/auditoria">Auditoría</NavLink>
+                    <NavLink class="sidebar-link" href="admin/reportes">Reportes</NavLink>
+                </Authorized>
+            </AuthorizeView>
+
+            <div class="mt-3 px-2">
+                <button class="btn btn-outline-secondary btn-sm w-100" @onclick="CerrarSesion">Cerrar sesión</button>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <span class="sidebar-heading">Cuenta</span>
+            <NavLink class="sidebar-link" href="login">Iniciar sesión</NavLink>
+            <NavLink class="sidebar-link" href="registro">Registrarse</NavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    <span class="sidebar-heading">Información</span>
+    <NavLink class="sidebar-link" href="privacidad">Privacidad</NavLink>
+</nav>
+
+@code {
+    private async Task CerrarSesion()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/login", true);
+    }
+}

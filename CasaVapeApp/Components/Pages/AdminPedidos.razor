@@ -1,0 +1,301 @@
+@page "/admin/pedidos"
+@attribute [Authorize(Roles = "Administrador")]
+@inject OrderService OrderService
+
+<PageTitle>Administrar pedidos - CasaVape</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+    <h1 class="h3 mb-0">Pedidos</h1>
+    <div class="d-flex gap-2">
+        <select class="form-select" style="width: auto;" @bind="filtroEstado" @bind:after="Cargar">
+            <option value="">Todos los estados</option>
+            @foreach (var estado in estados)
+            {
+                <option value="@estado">@estado</option>
+            }
+        </select>
+        <input class="form-control" style="width: 160px;" type="number" placeholder="Nº pedido" @bind="filtroQ" @bind:after="Cargar" />
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (!string.IsNullOrWhiteSpace(ok))
+{
+    <div class="alert alert-success alert-dismissible">
+        @ok
+        <button type="button" class="btn-close" @onclick="() => ok = null"></button>
+    </div>
+}
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else if (pedidos.Count == 0)
+{
+    <div class="alert alert-info">No hay pedidos que coincidan con los filtros.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Nº</th>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Estado</th>
+                        <th>Entrega</th>
+                        <th class="text-end">Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pedido in pedidos)
+                    {
+                        var mostrar = expandido == pedido.IdPedido;
+                        <tr>
+                            <td class="fw-bold">@pedido.IdPedido</td>
+                            <td>@pedido.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@pedido.Usuario</td>
+                            <td><span class="badge rounded-pill @EstadoClass(pedido.Estado)">@pedido.Estado</span></td>
+                            <td>@pedido.MetodoEntrega</td>
+                            <td class="text-end">$@pedido.Total.ToString("N2")</td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => Toggle(pedido.IdPedido)">
+                                    @(mostrar ? "Ocultar" : "Detalle")
+                                </button>
+                            </td>
+                        </tr>
+                        if (mostrar)
+                        {
+                            <tr>
+                                <td colspan="7" class="bg-body-secondary">
+                                    <div class="row g-3">
+                                        <div class="col-lg-7">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle mb-2">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Producto</th>
+                                                            <th class="text-end">Cant.</th>
+                                                            <th class="text-end">Precio unit.</th>
+                                                            <th class="text-end">Subtotal</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var detalle in pedido.Detalles)
+                                                        {
+                                                            <tr>
+                                                                <td>@detalle.Producto</td>
+                                                                <td class="text-end">@detalle.Cantidad</td>
+                                                                <td class="text-end">$@detalle.PrecioUnitario.ToString("N2")</td>
+                                                                <td class="text-end">$@detalle.Subtotal.ToString("N2")</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr>
+                                                            <th colspan="2" class="text-end">Envío</th>
+                                                            <th colspan="2" class="text-end">$@pedido.CostoEnvio.ToString("N2")</th>
+                                                        </tr>
+                                                        <tr>
+                                                            <th colspan="2" class="text-end">Total</th>
+                                                            <th colspan="2" class="text-end">$@pedido.Total.ToString("N2")</th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-5">
+                                            @if (pedido.Pagos.Count > 0)
+                                            {
+                                                var pago = pedido.Pagos[0];
+                                                <p class="mb-2">
+                                                    <strong>Pago:</strong> @pago.MetodoPago
+                                                    <span class="badge rounded-pill @PagoClass(pago.EstadoPago)">@pago.EstadoPago</span>
+                                                </p>
+                                            }
+
+                                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                                @foreach (var transicion in Transiciones(pedido))
+                                                {
+                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => CambiarEstado(pedido, transicion)" disabled="@(procesandoId == pedido.IdPedido)">
+                                                        @transicion
+                                                    </button>
+                                                }
+                                                @if (PuedeConfirmarPago(pedido))
+                                                {
+                                                    <button class="btn btn-outline-success btn-sm" @onclick="() => ConfirmarPago(pedido)" disabled="@(procesandoId == pedido.IdPedido)">
+                                                        Confirmar pago
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => RechazarPago(pedido)" disabled="@(procesandoId == pedido.IdPedido)">
+                                                        Rechazar pago
+                                                    </button>
+                                                }
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => DescargarComprobante(pedido.IdPedido)" disabled="@(procesandoId == pedido.IdPedido)">
+                                                    Comprobante
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] estados = { "Pendiente", "Pagado", "Enviado", "Entregado", "Cancelado" };
+
+    private List<OrderDto> pedidos = new();
+    private string? filtroEstado;
+    private int? filtroQ;
+    private int? expandido;
+    private int? procesandoId;
+    private bool loading = true;
+    private string? error;
+    private string? ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+        loading = false;
+    }
+
+    private async Task Cargar()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        pedidos = await OrderService.GetAdminOrdersAsync(filtroEstado, filtroQ?.ToString());
+    }
+
+    private void Toggle(int idPedido)
+    {
+        expandido = expandido == idPedido ? null : idPedido;
+    }
+
+    private static IEnumerable<string> Transiciones(OrderDto pedido) => pedido.Estado switch
+    {
+        "Pendiente" => new[] { "Pagado", "Cancelado" },
+        "Pagado" => new[] { "Enviado", "Cancelado" },
+        "Enviado" => new[] { "Entregado" },
+        _ => Array.Empty<string>()
+    };
+
+    private static bool PuedeConfirmarPago(OrderDto pedido) =>
+        pedido.Pagos.Count > 0 &&
+        pedido.Pagos[0].EstadoPago == "Pendiente" &&
+        pedido.Estado is "Pendiente" or "Pagado";
+
+    private async Task CambiarEstado(OrderDto pedido, string nuevoEstado)
+    {
+        error = null;
+        ok = null;
+        procesandoId = pedido.IdPedido;
+
+        var result = await OrderService.ChangeStatusAsync(pedido.IdPedido, nuevoEstado);
+        procesandoId = null;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo cambiar el estado del pedido.";
+            return;
+        }
+
+        ok = $"Pedido #{pedido.IdPedido} ahora está {nuevoEstado}.";
+        await CargarAsync();
+    }
+
+    private async Task ConfirmarPago(OrderDto pedido)
+    {
+        error = null;
+        ok = null;
+        procesandoId = pedido.IdPedido;
+
+        var result = await OrderService.ConfirmPaymentAsync(pedido.IdPedido);
+        procesandoId = null;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo confirmar el pago.";
+            return;
+        }
+
+        ok = $"Pago del pedido #{pedido.IdPedido} confirmado.";
+        await CargarAsync();
+    }
+
+    private async Task RechazarPago(OrderDto pedido)
+    {
+        error = null;
+        ok = null;
+        procesandoId = pedido.IdPedido;
+
+        var result = await OrderService.RejectPaymentAsync(pedido.IdPedido);
+        procesandoId = null;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo rechazar el pago.";
+            return;
+        }
+
+        ok = $"Pago del pedido #{pedido.IdPedido} rechazado. El pedido fue cancelado y el stock repuesto.";
+        await CargarAsync();
+    }
+
+    private async Task DescargarComprobante(int idPedido)
+    {
+        error = null;
+        procesandoId = idPedido;
+
+        var result = await OrderService.DownloadReceiptAsync(idPedido);
+        procesandoId = null;
+
+        if (!result.Ok || result.Data is null)
+        {
+            error = result.Error ?? "No se pudo descargar el comprobante.";
+            return;
+        }
+
+        try
+        {
+            await Launcher.OpenAsync(new OpenFileRequest { File = new ReadOnlyFile(result.Data) });
+        }
+        catch
+        {
+            error = "No se pudo abrir el comprobante. Archivo guardado en " + result.Data;
+        }
+    }
+
+    private static string EstadoClass(string estado) => estado switch
+    {
+        "Pendiente" => "text-bg-warning",
+        "Pagado" => "text-bg-info",
+        "Enviado" => "text-bg-primary",
+        "Entregado" => "text-bg-success",
+        "Cancelado" => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+
+    private static string PagoClass(string estadoPago) => estadoPago switch
+    {
+        "Aprobado" => "text-bg-success",
+        "Rechazado" => "text-bg-danger",
+        _ => "text-bg-warning"
+    };
+}

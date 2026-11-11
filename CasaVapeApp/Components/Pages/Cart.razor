@@ -1,0 +1,71 @@
+@page "/carrito"
+@using CasaVapeApp.Models
+@using CasaVapeApp.Services
+@inject CartService CartService
+
+<PageTitle>Carrito - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Carrito</h1>
+
+@if (!CartService.Items.Any())
+{
+    <div class="alert alert-info">
+        Tu carrito está vacío.
+        <a href="/" class="alert-link">Seguir comprando</a>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Precio</th>
+                    <th>Cantidad</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in CartService.Items)
+                {
+                    <tr>
+                        <td>@item.Nombre</td>
+                        <td>$@item.Precio.ToString("N2")</td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm" style="width: 80px;"
+                                   min="1" max="@item.Stock" value="@item.Cantidad"
+                                   @onchange="e => CambiarCantidad(item.IdProducto, e.Value?.ToString())" />
+                        </td>
+                        <td>$@item.Subtotal.ToString("N2")</td>
+                        <td>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => CartService.Remove(item.IdProducto)">Quitar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Total</th>
+                    <th colspan="2">$@CartService.Subtotal.ToString("N2")</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="/" class="btn btn-secondary">Seguir comprando</a>
+        <a href="/checkout" class="btn btn-success">Finalizar compra</a>
+    </div>
+}
+
+@code {
+    private void CambiarCantidad(int idProducto, string? value)
+    {
+        if (int.TryParse(value, out var cantidad))
+        {
+            CartService.UpdateQuantity(idProducto, cantidad);
+        }
+    }
+}

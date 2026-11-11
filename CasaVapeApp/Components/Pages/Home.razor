@@ -1,0 +1,138 @@
+﻿@page "/"
+@using CasaVape.Core.DTOs
+@using CasaVapeApp.Services
+@using CasaVapeApp.Components.Shared
+@inject ProductService ProductService
+@inject CartService CartService
+
+<PageTitle>Catálogo - CasaVape</PageTitle>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(loadError))
+{
+    <div class="alert alert-danger">
+        @loadError
+        <div class="mt-2">
+            <button class="btn btn-outline-danger btn-sm" @onclick="LoadAsync">Reintentar</button>
+        </div>
+    </div>
+}
+else
+{
+    @if (carouselProducts.Any())
+    {
+        <div id="catalogoCarousel" class="carousel slide mb-4 product-carousel" data-bs-ride="carousel">
+            <div class="carousel-indicators">
+                @for (int i = 0; i < carouselProducts.Count; i++)
+                {
+                    <button type="button" data-bs-target="#catalogoCarousel" data-bs-slide-to="@i" class="@(i == 0 ? "active" : "")" aria-current="@(i == 0 ? "true" : "false")" aria-label="Slide @(i + 1)"></button>
+                }
+            </div>
+            <div class="carousel-inner rounded shadow-sm">
+                @for (int i = 0; i < carouselProducts.Count; i++)
+                {
+                    var product = carouselProducts[i];
+                    <div class="carousel-item @(i == 0 ? "active" : "")">
+                        <a href="/productos/@product.IdProducto">
+                            <img src="@product.ImagenUrl" class="d-block w-100" alt="@product.Nombre" style="height: 100%; object-fit: contain; background: transparent;" />
+                        </a>
+                        <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded px-3 py-2">
+                            <h5 class="mb-0">@product.Nombre</h5>
+                            <small>@(product.Categoria ?? "-")</small>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#catalogoCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#catalogoCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Siguiente</span>
+            </button>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h1 class="h3 mb-0">Catálogo</h1>
+        <div class="search-form">
+            <input class="form-control" type="search" placeholder="Buscar productos..." aria-label="Buscar productos" @bind="search" />
+            <button class="btn btn-primary" type="button" @onclick="LoadAsync">Buscar</button>
+            @if (!string.IsNullOrWhiteSpace(search))
+            {
+                <a href="/" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(search))
+    {
+        <p class="text-muted mt-2">Resultados para “@search” (@products.Count).</p>
+    }
+
+    @if (!products.Any())
+    {
+        <div class="alert alert-info mt-3">
+            @(string.IsNullOrWhiteSpace(search) ? "No hay productos disponibles." : "No se encontraron productos para la búsqueda.")
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-sm-2 g-3 mt-1">
+            @foreach (var product in products)
+            {
+                <div class="col">
+                    <ProductCard Product="product" OnAddToCart="AddToCart" />
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private bool isLoading = true;
+    private string? search;
+    private string? loadError;
+    private List<ProductDto> products = new();
+    private List<ProductDto> carouselProducts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            products = await ProductService.GetProductsAsync(search, null, 1, 20);
+
+            var candidates = products.Where(p => p.Activo && !string.IsNullOrWhiteSpace(p.ImagenUrl)).ToList();
+            carouselProducts = candidates.OrderBy(_ => Random.Shared.Next()).Take(5).ToList();
+        }
+        catch (Exception ex)
+        {
+            loadError = $"No se pudieron cargar los productos. Verifica la API en {ProductService.BaseAddress}. Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void AddToCart(ProductDto product)
+    {
+        CartService.Add(product, 1);
+    }
+}

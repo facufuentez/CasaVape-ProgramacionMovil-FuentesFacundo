@@ -1,0 +1,6 @@
+@CasaVapeApi_HostAddress = http://localhost:5178
+
+GET {{CasaVapeApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

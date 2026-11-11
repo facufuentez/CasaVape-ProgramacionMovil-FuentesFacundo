@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CasaVapeApi/CasaVapeApi.csproj" />
+  <Project Path="CasaVapeApp/CasaVapeApp.csproj" />
+</Solution>

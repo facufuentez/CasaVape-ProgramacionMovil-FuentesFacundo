@@ -1,0 +1,276 @@
+@page "/checkout"
+@attribute [Authorize]
+@inject CartService CartService
+@inject AddressService AddressService
+@inject ShippingMethodService ShippingMethodService
+@inject OrderService OrderService
+
+<PageTitle>Finalizar compra - CasaVape</PageTitle>
+
+@if (resultado is not null)
+{
+    <h1 class="h3 mb-3">Compra procesada</h1>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (resultado.CheckoutUrl is not null)
+            {
+                <div class="alert alert-info">
+                    Se generó tu orden en Mercado Pago por <strong>$@resultado.Total.ToString("N2")</strong>.
+                    Completá el pago para que el pedido se confirme.
+                </div>
+
+                <button class="btn btn-primary mb-3" @onclick="AbrirMercadoPago">
+                    <i class="fa-solid fa-credit-card me-2" aria-hidden="true"></i>
+                    Pagar con Mercado Pago
+                </button>
+            }
+            else
+            {
+                <div class="alert alert-success">
+                    ¡Pedido creado! @resultado.Mensaje
+                </div>
+
+                <p class="mb-1">Pedido <strong>#@resultado.PedidoId</strong></p>
+                <p class="mb-1">Estado: <strong>@resultado.Estado</strong></p>
+                <p>Total: <strong>$@resultado.Total.ToString("N2")</strong></p>
+            }
+
+            <div class="d-flex gap-2 mt-3">
+                <a href="/pedidos" class="btn btn-primary">Ver mis pedidos</a>
+                <a href="/" class="btn btn-secondary">Seguir comprando</a>
+            </div>
+        </div>
+    </div>
+}
+else if (!CartService.Items.Any())
+{
+    <h1 class="h3 mb-3">Finalizar compra</h1>
+    <div class="alert alert-info">
+        Tu carrito está vacío.
+        <a href="/" class="alert-link">Seguir comprando</a>
+    </div>
+}
+else
+{
+    <h1 class="h3 mb-3">Finalizar compra</h1>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    if (loading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Dirección de envío</h2>
+
+                        @if (direcciones.Count == 0)
+                        {
+                            <div class="alert alert-warning">
+                                No tenés direcciones cargadas.
+                                <a href="/direcciones" class="alert-link">Agregar una dirección</a>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var direccion in direcciones)
+                            {
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="direccion"
+                                           id="dir-@direccion.IdDireccion" checked="@(idDireccion == direccion.IdDireccion)"
+                                           @onchange="() => idDireccion = direccion.IdDireccion" />
+                                    <label class="form-check-label" for="dir-@direccion.IdDireccion">
+                                        @direccion.Calle @direccion.Numero - @direccion.Ciudad, @direccion.Provincia (CP @direccion.CodigoPostal)
+                                    </label>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Método de entrega</h2>
+
+                        @foreach (var metodo in metodosEntrega)
+                        {
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="entrega"
+                                       id="ent-@metodo.Id" checked="@(idMetodoEntrega == metodo.Id)"
+                                       @onchange="() => SeleccionarEntrega(metodo)" />
+                                <label class="form-check-label" for="ent-@metodo.Id">
+                                    @metodo.Nombre <span class="text-muted">(+$@metodo.Costo.ToString("N2"))</span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Método de pago</h2>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="pago" id="pago-efectivo"
+                                   checked="@(metodoPago == "Efectivo")" @onchange='() => metodoPago = "Efectivo"' />
+                            <label class="form-check-label" for="pago-efectivo">Efectivo</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="pago" id="pago-qr"
+                                   checked="@(metodoPago == "Transferencia por QR")" @onchange='() => metodoPago = "Transferencia por QR"' />
+                            <label class="form-check-label" for="pago-qr">Transferencia por QR</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pago" id="pago-mp"
+                                   checked="@(metodoPago == "Mercado Pago")" @onchange='() => metodoPago = "Mercado Pago"' />
+                            <label class="form-check-label" for="pago-mp">Mercado Pago</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Resumen</h2>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <tbody>
+                                    @foreach (var item in CartService.Items)
+                                    {
+                                        <tr>
+                                            <td>@item.Nombre x@item.Cantidad</td>
+                                            <td class="text-end">$@item.Subtotal.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Subtotal</span>
+                            <span>$@CartService.Subtotal.ToString("N2")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Envío</span>
+                            <span>$@(costoEnvio?.ToString("N2") ?? "-")</span>
+                        </div>
+                        <div class="d-flex justify-content-between fw-bold fs-5">
+                            <span>Total</span>
+                            <span>$@TotalEstimado.ToString("N2")</span>
+                        </div>
+
+                        <button class="btn btn-success w-100 mt-3" @onclick="Confirmar" disabled="@(procesando || direcciones.Count == 0)">
+                            @if (procesando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Confirmar compra
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<AddressDto> direcciones = new();
+    private List<ShippingMethodDto> metodosEntrega = new();
+    private int idDireccion;
+    private int idMetodoEntrega;
+    private decimal? costoEnvio;
+    private string metodoPago = "Efectivo";
+    private CheckoutResponseDto? resultado;
+    private bool loading = true;
+    private bool procesando;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        direcciones = await AddressService.GetAddressesAsync();
+        metodosEntrega = await ShippingMethodService.GetShippingMethodsAsync();
+
+        if (direcciones.Count > 0)
+        {
+            idDireccion = direcciones[0].IdDireccion;
+        }
+
+        if (metodosEntrega.Count > 0)
+        {
+            idMetodoEntrega = metodosEntrega[0].Id;
+            costoEnvio = metodosEntrega[0].Costo;
+        }
+
+        loading = false;
+    }
+
+    private decimal TotalEstimado => CartService.Subtotal + (costoEnvio ?? 0);
+
+    private void SeleccionarEntrega(ShippingMethodDto metodo)
+    {
+        idMetodoEntrega = metodo.Id;
+        costoEnvio = metodo.Costo;
+    }
+
+    private async Task Confirmar()
+    {
+        error = null;
+        procesando = true;
+
+        var request = new CheckoutRequest
+        {
+            IdDireccion = idDireccion,
+            IdMetodoEntrega = idMetodoEntrega,
+            MetodoPago = metodoPago,
+            Items = CartService.Items
+                .Select(i => new CheckoutItemRequest { IdProducto = i.IdProducto, Cantidad = i.Cantidad })
+                .ToList()
+        };
+
+        var result = await OrderService.CheckoutAsync(request);
+        procesando = false;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo procesar la compra.";
+            return;
+        }
+
+        resultado = result.Data;
+        CartService.Clear();
+
+        if (resultado?.CheckoutUrl is not null)
+        {
+            await AbrirMercadoPago();
+        }
+    }
+
+    private async Task AbrirMercadoPago()
+    {
+        if (resultado?.CheckoutUrl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Launcher.OpenAsync(new Uri(resultado.CheckoutUrl));
+        }
+        catch
+        {
+            error = "No se pudo abrir Mercado Pago. Volvé a intentar desde este botón.";
+        }
+    }
+}

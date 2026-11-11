@@ -1,0 +1,88 @@
+@page "/registro"
+@using CasaVape.Core.DTOs
+@using CasaVapeApp.Services
+@attribute [AllowAnonymous]
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Crear cuenta - CasaVape</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-3">Crear cuenta</h1>
+
+                @if (!string.IsNullOrWhiteSpace(error))
+                {
+                    <div class="alert alert-danger">@error</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label">Nombre</label>
+                    <input class="form-control" @bind="request.Nombre" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Apellido</label>
+                    <input class="form-control" @bind="request.Apellido" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Fecha de nacimiento</label>
+                    <input class="form-control" type="date" @bind="request.FechaNacimiento" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" type="email" @bind="request.Email" autocomplete="username" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Contraseña</label>
+                    <input class="form-control" type="password" @bind="request.Password" autocomplete="new-password" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Confirmar contraseña</label>
+                    <input class="form-control" type="password" @bind="request.ConfirmPassword" autocomplete="new-password" />
+                </div>
+
+                <button class="btn btn-primary w-100" @onclick="Registrar" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Crear cuenta
+                </button>
+
+                <div class="text-center mt-3">
+                    <a href="/login">Ya tengo cuenta</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterRequest request = new() { FechaNacimiento = DateTime.Today.AddYears(-18) };
+    private string? error;
+    private bool isLoading;
+
+    private async Task Registrar()
+    {
+        error = null;
+        isLoading = true;
+
+        var auth = await AuthService.RegisterAsync(request);
+        isLoading = false;
+
+        if (auth is null)
+        {
+            error = "No se pudo crear la cuenta. Revisa los datos ingresados.";
+            return;
+        }
+
+        Navigation.NavigateTo("/");
+    }
+}

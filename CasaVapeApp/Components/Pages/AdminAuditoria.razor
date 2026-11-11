@@ -1,0 +1,160 @@
+@page "/admin/auditoria"
+@attribute [Authorize(Roles = "Administrador")]
+@inject AuditService AuditService
+
+<PageTitle>Auditoría - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Auditoría</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Usuario</label>
+                <input class="form-control" placeholder="Email..." @bind="filtroUsuario" @bind:after="Recargar" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Entidad</label>
+                <input class="form-control" placeholder="Pedido..." @bind="filtroEntidad" @bind:after="Recargar" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Acción</label>
+                <input class="form-control" placeholder="Crear..." @bind="filtroAccion" @bind:after="Recargar" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Desde</label>
+                <input class="form-control" type="date" @bind="filtroDesde" @bind:after="Recargar" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Hasta</label>
+                <input class="form-control" type="date" @bind="filtroHasta" @bind:after="Recargar" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else if (auditorias.Count == 0)
+{
+    <div class="alert alert-info">No hay registros que coincidan con los filtros.</div>
+}
+else
+{
+    <div class="card shadow-sm mb-3">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Entidad</th>
+                        <th>Antes / Después</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var registro in auditorias)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@registro.Fecha.ToString("dd/MM/yy HH:mm")</td>
+                            <td>@registro.Usuario</td>
+                            <td><span class="badge text-bg-secondary">@registro.Accion</span></td>
+                            <td>@registro.Entidad #@registro.IdEntidad</td>
+                            <td class="small text-muted" style="max-width: 420px;">
+                                @if (!string.IsNullOrWhiteSpace(registro.ValoresAnteriores))
+                                {
+                                    <div><strong>Antes:</strong> @Truncar(registro.ValoresAnteriores)</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(registro.ValoresNuevos))
+                                {
+                                    <div><strong>Después:</strong> @Truncar(registro.ValoresNuevos)</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => CambiarPagina(pagina - 1)" disabled="@(pagina <= 1 || cargando)">
+            @if (cargando && pagina > 1)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            Anterior
+        </button>
+        <span class="text-muted">Página @pagina</span>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => CambiarPagina(pagina + 1)" disabled="@(auditorias.Count < pageSize || cargando)">
+            @if (cargando && pagina > 1)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            Siguiente
+        </button>
+    </div>
+}
+
+@code {
+    private const int pageSize = 50;
+
+    private List<AuditDto> auditorias = new();
+    private string? filtroUsuario;
+    private string? filtroEntidad;
+    private string? filtroAccion;
+    private DateTime? filtroDesde;
+    private DateTime? filtroHasta;
+    private int pagina = 1;
+    private bool loading = true;
+    private bool cargando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+        loading = false;
+    }
+
+    private async Task Recargar()
+    {
+        pagina = 1;
+        cargando = true;
+        await CargarAsync();
+        cargando = false;
+    }
+
+    private async Task CambiarPagina(int nuevaPagina)
+    {
+        if (nuevaPagina < 1)
+        {
+            return;
+        }
+
+        pagina = nuevaPagina;
+        cargando = true;
+        await CargarAsync();
+        cargando = false;
+    }
+
+    private async Task CargarAsync()
+    {
+        auditorias = await AuditService.GetAuditsAsync(
+            filtroUsuario,
+            filtroEntidad,
+            filtroAccion,
+            filtroDesde,
+            filtroHasta,
+            pagina,
+            pageSize);
+    }
+
+    private static string Truncar(string valor, int largo = 120)
+    {
+        return valor.Length <= largo ? valor : valor[..largo] + "...";
+    }
+}

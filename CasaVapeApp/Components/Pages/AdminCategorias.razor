@@ -1,0 +1,190 @@
+@page "/admin/categorias"
+@attribute [Authorize(Roles = "Administrador")]
+@inject CategoryService CategoryService
+@inject IJSRuntime JS
+
+<PageTitle>Administrar categorías - CasaVape</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
+    <h1 class="h3 mb-0">Categorías</h1>
+    <button class="btn btn-primary" @onclick="Nuevo">Nueva categoría</button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (!string.IsNullOrWhiteSpace(ok))
+{
+    <div class="alert alert-success alert-dismissible">
+        @ok
+        <button type="button" class="btn-close" @onclick="() => ok = null"></button>
+    </div>
+}
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var categoria in categorias)
+                    {
+                        <tr>
+                            <td>@categoria.Nombre</td>
+                            <td class="text-muted">@categoria.Descripcion</td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Editar(categoria)">Editar</button>
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => Eliminar(categoria)">Eliminar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    if (editandoVisible)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">@(editando is null ? "Nueva categoría" : "Editar categoría")</h2>
+
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" @bind="request.Nombre" />
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label">Descripción</label>
+                        <input class="form-control" @bind="request.Descripcion" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-primary" @onclick="Guardar" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar
+                    </button>
+                    <button class="btn btn-secondary" @onclick="Cancelar" disabled="@saving">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<CategoryDto> categorias = new();
+    private CreateCategoryRequest request = new();
+    private CategoryDto? editando;
+    private bool editandoVisible;
+    private bool loading = true;
+    private bool saving;
+    private string? error;
+    private string? ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+        loading = false;
+    }
+
+    private async Task CargarAsync()
+    {
+        categorias = await CategoryService.GetCategoriesAsync();
+    }
+
+    private void Nuevo()
+    {
+        editando = null;
+        request = new CreateCategoryRequest();
+        editandoVisible = true;
+        error = null;
+        ok = null;
+    }
+
+    private void Editar(CategoryDto categoria)
+    {
+        editando = categoria;
+        request = new CreateCategoryRequest
+        {
+            Nombre = categoria.Nombre,
+            Descripcion = categoria.Descripcion
+        };
+        editandoVisible = true;
+        error = null;
+        ok = null;
+    }
+
+    private void Cancelar()
+    {
+        editando = null;
+        editandoVisible = false;
+    }
+
+    private async Task Guardar()
+    {
+        error = null;
+        ok = null;
+
+        if (string.IsNullOrWhiteSpace(request.Nombre))
+        {
+            error = "Ingresá el nombre de la categoría.";
+            return;
+        }
+
+        saving = true;
+        var result = editando is null
+            ? await CategoryService.CreateAsync(request)
+            : await CategoryService.UpdateAsync(editando.IdCategoria, request);
+        saving = false;
+
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo guardar la categoría.";
+            return;
+        }
+
+        ok = editando is null ? "Categoría creada correctamente." : "Categoría actualizada correctamente.";
+        Cancelar();
+        await CargarAsync();
+    }
+
+    private async Task Eliminar(CategoryDto categoria)
+    {
+        error = null;
+        ok = null;
+
+        var confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Eliminar la categoría '{categoria.Nombre}'?");
+        if (!confirmado)
+        {
+            return;
+        }
+
+        var result = await CategoryService.DeleteAsync(categoria.IdCategoria);
+        if (!result.Ok)
+        {
+            error = result.Error ?? "No se pudo eliminar la categoría.";
+            return;
+        }
+
+        ok = "Categoría eliminada correctamente.";
+        await CargarAsync();
+    }
+}

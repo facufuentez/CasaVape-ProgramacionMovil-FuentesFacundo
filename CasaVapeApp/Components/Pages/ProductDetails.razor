@@ -1,0 +1,93 @@
+@page "/productos/{Id:int}"
+@using CasaVape.Core.DTOs
+@using CasaVapeApp.Services
+@inject ProductService ProductService
+@inject CartService CartService
+
+<PageTitle>Detalle del producto - CasaVape</PageTitle>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+}
+else if (product is null)
+{
+    <div class="alert alert-danger">Producto no encontrado.</div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-md-5">
+            @if (!string.IsNullOrEmpty(product.ImagenUrl))
+            {
+                <img src="@product.ImagenUrl" class="img-fluid rounded shadow-sm" alt="@product.Nombre" />
+            }
+            else
+            {
+                <img src="images/sin-imagen.svg" class="img-fluid rounded shadow-sm" alt="@product.Nombre" />
+            }
+        </div>
+        <div class="col-md-7">
+            <h1 class="h3">@product.Nombre</h1>
+            <div class="text-muted mb-2">@(product.Categoria ?? "-")</div>
+
+            @if (!string.IsNullOrWhiteSpace(product.Descripcion))
+            {
+                <p class="text-muted">@product.Descripcion</p>
+            }
+
+            <div class="fs-3 fw-bold mb-3">$@product.Precio.ToString("N2")</div>
+
+            @if (!product.Activo)
+            {
+                <span class="badge bg-secondary mb-3">Inactivo</span>
+            }
+            else if (product.Stock <= 0)
+            {
+                <span class="badge bg-danger mb-3">Sin stock</span>
+            }
+            else
+            {
+                <span class="badge bg-success mb-3">En stock</span>
+            }
+
+            @if (product.Activo && product.Stock > 0)
+            {
+                <div class="d-flex gap-2 align-items-center">
+                    <input type="number" class="form-control" style="width: 100px;" min="1" max="@product.Stock" @bind="cantidad" />
+                    <button class="btn btn-success" @onclick="Agregar">Agregar al carrito</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private bool isLoading = true;
+    private ProductDto? product;
+    private int cantidad = 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        product = await ProductService.GetProductAsync(Id);
+        isLoading = false;
+    }
+
+    private void Agregar()
+    {
+        if (product is null)
+        {
+            return;
+        }
+
+        CartService.Add(product, cantidad);
+    }
+}

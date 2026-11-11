@@ -1,0 +1,69 @@
+@page "/login"
+@using CasaVape.Core.DTOs
+@using CasaVapeApp.Services
+@attribute [AllowAnonymous]
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Iniciar sesión - CasaVape</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-3">Iniciar sesión</h1>
+
+                @if (!string.IsNullOrWhiteSpace(error))
+                {
+                    <div class="alert alert-danger">@error</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" @bind="email" autocomplete="username" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Contraseña</label>
+                    <input class="form-control" type="password" @bind="password" autocomplete="current-password" />
+                </div>
+
+                <button class="btn btn-primary w-100" @onclick="Ingresar" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Ingresar
+                </button>
+
+                <div class="text-center mt-3">
+                    <a href="/registro">Crear cuenta</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string? error;
+    private bool isLoading;
+
+    private async Task Ingresar()
+    {
+        error = null;
+        isLoading = true;
+
+        var auth = await AuthService.LoginAsync(email, password);
+        isLoading = false;
+
+        if (auth is null)
+        {
+            error = "Email o contraseña incorrectos.";
+            return;
+        }
+
+        Navigation.NavigateTo("/");
+    }
+}

@@ -1,0 +1,47 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+out/
+publish/
+Publicacion/
+
+# Visual Studio / IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/
+
+# Publish profiles (may contain credentials like _SavePWD)
+*.pubxml
+*.PublishSettings
+*.pubxml.user
+PublishProfiles/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+*.pem
+secrets.json
+
+# App configuration with secrets (use appsettings.example.json)
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+!appsettings.Development.json.example
+
+# MAUI/Android generated
+*.apk
+*.aab
+*.apks
+
+# OS / misc
+.DS_Store
+Thumbs.db
+*.log

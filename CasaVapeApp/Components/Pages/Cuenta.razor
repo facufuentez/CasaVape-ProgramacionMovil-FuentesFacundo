@@ -1,0 +1,180 @@
+@page "/cuenta"
+@attribute [Authorize]
+@inject AccountService AccountService
+
+<PageTitle>Mi cuenta - CasaVape</PageTitle>
+
+<h1 class="h3 mb-3">Mi cuenta</h1>
+
+@if (loading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border" role="status"></div>
+    </div>
+}
+else if (profile is null)
+{
+    <div class="alert alert-danger">No se pudo cargar tu perfil. Volvé a intentar más tarde.</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(errorPerfil))
+    {
+        <div class="alert alert-danger">@errorPerfil</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(okPerfil))
+    {
+        <div class="alert alert-success">@okPerfil</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Datos personales</h2>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" value="@profile.Email" readonly disabled />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" @bind="request.Nombre" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Apellido</label>
+                        <input class="form-control" @bind="request.Apellido" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Fecha de nacimiento</label>
+                        <input class="form-control" type="date" @bind="request.FechaNacimiento" />
+                    </div>
+
+                    <button class="btn btn-primary" @onclick="GuardarPerfil" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Guardar cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Cambiar contraseña</h2>
+
+                    @if (!string.IsNullOrWhiteSpace(errorPassword))
+                    {
+                        <div class="alert alert-danger">@errorPassword</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(okPassword))
+                    {
+                        <div class="alert alert-success">@okPassword</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña actual</label>
+                        <input class="form-control" type="password" @bind="passwordRequest.CurrentPassword" autocomplete="current-password" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Nueva contraseña</label>
+                        <input class="form-control" type="password" @bind="passwordRequest.NewPassword" autocomplete="new-password" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Confirmar nueva contraseña</label>
+                        <input class="form-control" type="password" @bind="passwordRequest.ConfirmPassword" autocomplete="new-password" />
+                    </div>
+
+                    <button class="btn btn-primary" @onclick="CambiarPassword" disabled="@savingPassword">
+                        @if (savingPassword)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Cambiar contraseña
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ProfileResponse? profile;
+    private UpdateProfileRequest request = new();
+    private ChangePasswordRequest passwordRequest = new();
+    private bool loading = true;
+    private bool saving;
+    private bool savingPassword;
+    private string? errorPerfil;
+    private string? okPerfil;
+    private string? errorPassword;
+    private string? okPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await AccountService.GetProfileAsync();
+        if (profile is not null)
+        {
+            request = new UpdateProfileRequest
+            {
+                Nombre = profile.Nombre,
+                Apellido = profile.Apellido,
+                FechaNacimiento = profile.FechaNacimiento
+            };
+        }
+
+        loading = false;
+    }
+
+    private async Task GuardarPerfil()
+    {
+        errorPerfil = null;
+        okPerfil = null;
+        saving = true;
+
+        var result = await AccountService.UpdateProfileAsync(request);
+        saving = false;
+
+        if (!result.Ok)
+        {
+            errorPerfil = result.Error ?? "No se pudo actualizar el perfil.";
+            return;
+        }
+
+        profile = result.Data;
+        okPerfil = "Perfil actualizado correctamente.";
+    }
+
+    private async Task CambiarPassword()
+    {
+        errorPassword = null;
+        okPassword = null;
+
+        if (passwordRequest.NewPassword != passwordRequest.ConfirmPassword)
+        {
+            errorPassword = "Las contraseñas nuevas no coinciden.";
+            return;
+        }
+
+        savingPassword = true;
+        var result = await AccountService.ChangePasswordAsync(passwordRequest);
+        savingPassword = false;
+
+        if (!result.Ok)
+        {
+            errorPassword = result.Error ?? "No se pudo cambiar la contraseña.";
+            return;
+        }
+
+        passwordRequest = new ChangePasswordRequest();
+        okPassword = "Contraseña actualizada correctamente.";
+    }
+}
