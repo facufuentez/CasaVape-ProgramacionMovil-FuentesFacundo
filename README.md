@@ -134,7 +134,7 @@ Capturas reales de la app Android corriendo contra la API (más bocetos de la gu
 
 ## Base de datos
 
-SQL Server Express, base de datos **`E-COMMERCE`** (compartida con el proyecto MVC de referencia). Diseño del DER (actual):
+SQL Server Express, base de datos **`E-COMMERCE`** (compartida con el proyecto MVC de referencia). Diseño del DER (actual, sin todas las tablas de Identity):
 
 ![DERACTUAL](docs/images/guia/DER_ecommerce.png)
 
